@@ -1,0 +1,6 @@
+numba
+pyroaring
+tables
+Unidecode
+screeninfo
+numpy
