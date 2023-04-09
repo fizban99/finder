@@ -1,10 +1,15 @@
 # finder
 
 Python application to search files after indexing them. Similar to voidtool's Everything, but much simpler. Supports partial match and some filterings:
+
 `<n>:` Limit search to specified database
+
 `docx:` Limit search to documents (docx, doc)
+
 `zip:` Limit search to compressed files (zip, 7z)
+
 `exe:` Limit search to executable files (exe, com, bat, cmd)
+
 
 ## Warnings & Known Issues
 - Does not support regexp
