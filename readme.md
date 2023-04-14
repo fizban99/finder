@@ -1,6 +1,6 @@
 # finder
 
-Python application to search files after indexing them. Similar to voidtool's Everything, since it shows results as you type, but much simpler, so it does not require Administrative privileges, but does not update the database in real time. It has a relatively low memory footprint during normal operation, but indexing might require more memory. Supports partial match so if you type different pieces of text separated by space, the tool will retrieve the files that match all the partial matches (an AND of all the text pieces). Also supports some filterings:
+Python application to search files after indexing them. Similar to voidtool's Everything, since it shows results as you type, but much simpler, so it does not require Administrative privileges, but does not update the database in real time and currently only shows the first 50 matches. It has a relatively low memory footprint during normal operation, but indexing might require more memory. Supports partial match so if you type different pieces of text separated by space, the tool will retrieve the files that match all the partial matches (an AND of all the text pieces). Also supports some filterings:
 
 `<n>:` Limit search to specified database
 
