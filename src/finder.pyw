@@ -16,6 +16,8 @@ from functools import partial
 from indexer import create_index
 import sys
 import subprocess
+from time import time
+from pyroaring import BitMap
 
 
 # Custom event names
@@ -314,15 +316,17 @@ class App:
        
         
         for match in self.matches:
-            if match[0][0]=="<":
+            if match[2]=="-":
                 icon = self.folder_icon
-                match_0=match[0][1:]
             else:
-                match_0=match[0]
                 icon = self.document_icon
-            self.treeview.insert("", tk.END, text = match_0, image=icon ,values=[match[1],match[2], match[3]])
-                    
-        self.statusbar.set(locale.format_string("%d", self.match_count, grouping=True) + " objects")
+            self.treeview.insert("", tk.END, text = match[0], image=icon ,values=[match[1],match[2], match[3]])
+        
+        if self.match_count > len(self.matches):
+            note = f" (displaying only {len(self.matches)})"
+        else:
+            note = ""
+        self.statusbar.set(locale.format_string("%d", self.match_count, grouping=True) + " objects" + note)
      
         self.treeview.update_idletasks()
         update_scrollbar(self.treeview, self.scrollbar)
@@ -370,79 +374,98 @@ class App:
             max_files = 0 
         else:
             max_files = max_files - self.match_count
+         
             
         if text!="":
             node_type = ""
             if ":" in text:
                 text = text.split(":")
                 node_type, text = text[0], text[1]
-            text=unidecode(text.lower()).encode("utf8")
+            text=unidecode(text.lower())
             if len(text)==0:
                 return []
-            text2=text + b'\x7f'
-            condition = ""
-            
-            ext_map = {"doc": 2,
-                       "docx":2,
-                       "zip": 3,
-                       "7z": 3,
-                       "exe": 4,
-                       "com": 4,
-                       "bat": 4,
-                       "cmd": 4,
-                       }
-            
-            if node_type == "file":
-                condition = "(type>0)"
-            elif node_type == "folder":
-                condition = "(type==0)"
-            elif node_type in ext_map:
-                condition = f"(type=={ext_map[node_type]})"
-            
-            
-            entry_id_start = binary_search(store.root.entries, "partial_entry", text)
-            
-            index_id_start = binary_search(store.root.index, "entry_id", entry_id_start)
-
-            # Return if no matches found unless there is one single match 
-            # (because of the optimization of not having all the text for single matches)
-            if text != store.root.entries[entry_id_start]["partial_entry"][:len(text)]:
-                if entry_id_start == 0:
-                    return
-                entry_id_start -= 1
+            stext = text.split()
+        
+            prev_file_ids = None
+            for text in stext:
+                text = text.encode("utf8")
+                
+                text2=text + b'\x7f'
+                condition = ""
+                
+                ext_map = {"doc": 2,
+                           "docx":2,
+                           "zip": 3,
+                           "7z": 3,
+                           "exe": 4,
+                           "com": 4,
+                           "bat": 4,
+                           "cmd": 4,
+                           }
+                
+                if node_type == "file":
+                    condition = "(type>0)"
+                elif node_type == "folder":
+                    condition = "(type==0)"
+                elif node_type in ext_map:
+                    condition = f"(type=={ext_map[node_type]})"
+                
+                st = time()
+                entry_id_start = binary_search(store.root.entries, "partial_entry", text)
+                
                 index_id_start = binary_search(store.root.index, "entry_id", entry_id_start)
-                node_id = store.root.index[index_id_start]["file_id"]
-                node_text = store.root.nodes[node_id]["entry"]
-                node_text = unidecode(node_text.decode("utf8").lower()).encode("utf8")
-                # print(node_text)
-                if text not in node_text:
-                    return[]
-            
-            entry_id_end = binary_search(store.root.entries, "partial_entry", text2, entry_id_start)
-            # print(entry_id_start, entry_id_end)
-            if entry_id_end is None:
-                entry_id_end = store.root.entries.nrows
-            
+                # print(time()-st)
+                # Return if no matches found unless there is one single match 
+                # (because of the optimization of not having all the text for single matches)
+                if text != store.root.entries[entry_id_start]["partial_entry"][:len(text)]:
+                    if entry_id_start == 0:
+                        return
+                    entry_id_start -= 1
+                    index_id_start = binary_search(store.root.index, "entry_id", entry_id_start)
+                    node_id = store.root.index[index_id_start]["file_id"]
+                    node_text = store.root.nodes[node_id]["entry"]
+                    node_text = unidecode(node_text.decode("utf8").lower()).encode("utf8")
+                    # print(node_text)
+                    if text not in node_text:
+                        return[]
+                
+                entry_id_end = binary_search(store.root.entries, "partial_entry", text2, entry_id_start)
+                # print(entry_id_start, entry_id_end)
+                if entry_id_end is None:
+                    entry_id_end = store.root.entries.nrows
+                
+    
+                index_id_stop = binary_search(store.root.index, "entry_id", entry_id_end, index_id_start, leftmost=True)+1
+                # print(entry_id_end, store.root.index[index_id_stop-1]["entry_id"])
+                # print(index_id_start, index_id_stop)
+                if index_id_stop is None:
+                    index_id_stop = store.root.index.nrows
+                elif index_id_stop == index_id_start+1:
+                    index_id_stop +=1
+                # if index_id_stop -index_id_start <10:
+                #         print(store.root.index[index_id_start:index_id_stop])
+                if condition == "":
+                    file_ids = np.unique(store.root.index.read(start=index_id_start, stop = index_id_stop-1, field="file_id" ))
+                else:
+                    file_ids = np.unique(store.root.index.read_where(condition=condition, start=index_id_start, stop = index_id_stop-1, field="file_id" ))
+                
 
-            index_id_stop = binary_search(store.root.index, "entry_id", entry_id_end, index_id_start, leftmost=True)+1
-            # print(entry_id_end, store.root.index[index_id_stop-1]["entry_id"])
-            # print(index_id_start, index_id_stop)
-            if index_id_stop is None:
-                index_id_stop = store.root.index.nrows
-            elif index_id_stop == index_id_start+1:
-                index_id_stop +=1
-            # if index_id_stop -index_id_start <10:
-            #         print(store.root.index[index_id_start:index_id_stop])
-            if condition == "":
-                file_ids = np.unique(store.root.index.read(start=index_id_start, stop = index_id_stop-1, field="file_id" ))
-            else:
-                file_ids = np.unique(store.root.index.read_where(condition=condition, start=index_id_start, stop = index_id_stop-1, field="file_id" ))
-            self.match_count += len(file_ids)
+                if len(stext) >0:
+                    if prev_file_ids is None:
+                        prev_file_ids = BitMap()
+                        prev_file_ids.update(file_ids)
+                    else:
+                        bfile_ids = BitMap()
+                        bfile_ids.update(file_ids)
+                        prev_file_ids = prev_file_ids.intersection(bfile_ids)
+            self.match_count += len(prev_file_ids)
+                        
         else:
             self.match_count += len(store.root.nodes)
-            file_ids = list(range(0,max_files))
+            prev_file_ids = range(0,max_files)
 
-        
+        self.statusbar.set(locale.format_string("%d", self.match_count, grouping=True) + " objects. Retrieving details...")
+        file_ids = prev_file_ids
         max_files = min(max_files, store.root.nodes.nrows)
         matches = []
         for file_id in file_ids[:max_files]:
@@ -454,11 +477,8 @@ class App:
                modification_date = modification_date.strftime("%Y-%m-%d %H:%M")
            else:
                modification_date = "????"
-           if node["type"] == 0:
-               
+           if node["type"] == 0:             
                size = "-"
-               
-               match = f"<{match}"
            else:
                if os.path.exists(file_path):
                    size = locale.format_string("%d", os.path.getsize(file_path), grouping=True)
@@ -466,6 +486,9 @@ class App:
                    size = "????"
            match = (match, store.root.paths[node["path_id"]]["path"].decode("utf8"), size, modification_date )
            matches.append(match)
+           # If user types before finishing, exit
+           if not self.queue.empty():
+               return []
 
         
         return matches

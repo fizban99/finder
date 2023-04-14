@@ -125,10 +125,12 @@ def create_index(file_name, disk_path, label):
             if progress >= prev_progress + 5:
                 prev_progress = progress
                 label.set(f"Creating index... {progress}%")
-            node = unidecode(node[0].decode("utf8").lower()).encode("utf8")
-            
-            expanded_nodes = [node[i:] for i in range(len(node))]
-            
+            node = unidecode(node[0].decode("utf8").lower())
+            expanded_nodes = []
+            split_node = node.split()
+            for snode in split_node:
+                expanded_nodes.extend( [snode[i:].encode("utf8") for i in range(len(snode))])
+
             for expanded_node in expanded_nodes:
                 expanded_dict[expanded_node].add(idx)
         
