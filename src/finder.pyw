@@ -410,9 +410,9 @@ class App:
                 elif node_type in ext_map:
                     condition = f"(type=={ext_map[node_type]})"
                 
-                st = time()
                 entry_id_start = binary_search(store.root.entries, "partial_entry", text)
-                
+                if entry_id_start is None:
+                    return []
                 index_id_start = binary_search(store.root.index, "entry_id", entry_id_start)
                 # print(time()-st)
                 # Return if no matches found unless there is one single match 
