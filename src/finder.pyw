@@ -332,16 +332,6 @@ class App:
         update_scrollbar(self.treeview, self.scrollbar)
 
 
-    def populate_treeview(self):
-        # Add some dummy data to the TreeView widget for demonstration purposes
-        for path, _, files in os.walk("."):
-            for name in files:
-                filename = os.path.join(path, name)
-                size = os.path.getsize(filename)
-                mod_time = os.path.getmtime(filename)
-                mod_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mod_time))
-                self.treeview.insert("", tk.END, text="", values=(name, path, size, mod_date))
-
 
     def on_right_mouse_click(self, event):
         # Select on right-mouse click
